@@ -238,6 +238,17 @@ class TelaAlunos(tk.Toplevel):
 
 
 if __name__ == "__main__":
+    import time
+    import requests
+
+    # Verifica se a API Flask já está ativa; se não estiver, inicia automaticamente em segundo plano
+    try:
+        requests.get("http://127.0.0.1:5000/biblioteca/alunos", timeout=1)
+    except Exception:
+        from app import iniciar_api
+        threading.Thread(target=iniciar_api, daemon=True).start()
+        time.sleep(1)
+
     root = tk.Tk()
     root.withdraw()
     tela = TelaAlunos(root)
