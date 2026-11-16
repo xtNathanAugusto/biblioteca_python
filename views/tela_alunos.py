@@ -18,7 +18,6 @@ class TelaAlunos(tk.Toplevel):
         self.resizable(False, False)
         self.aluno_id = None
 
-        # Formulário de Aluno
         form = ttk.LabelFrame(self, text="Dados de Aluno", padding=10)
         form.pack(padx=10, pady=10, fill="x")
 
@@ -34,7 +33,6 @@ class TelaAlunos(tk.Toplevel):
         self.curso_entry = ttk.Entry(form, width=50)
         self.curso_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
-        # Botões de Ação
         botoes = ttk.Frame(self)
         botoes.pack(fill="x", padx=10, pady=5)
 
@@ -61,7 +59,6 @@ class TelaAlunos(tk.Toplevel):
             self.btn_recarregar
         ]
 
-        # Barra de status / loading
         status_frame = ttk.Frame(self)
         status_frame.pack(side="bottom", fill="x", padx=10, pady=5)
 
@@ -70,7 +67,6 @@ class TelaAlunos(tk.Toplevel):
 
         self.progress = ttk.Progressbar(status_frame, mode="indeterminate", length=120)
 
-        # Tabela (Treeview) de Alunos
         tabela_frame = ttk.LabelFrame(self, text="Lista de Alunos", padding=10)
         tabela_frame.pack(padx=10, pady=5, fill="both", expand=True)
 
@@ -94,7 +90,6 @@ class TelaAlunos(tk.Toplevel):
 
         self.tree.bind("<<TreeviewSelect>>", self.ao_selecionar)
 
-        # Carregar lista inicial
         self.listar()
 
     def iniciar_loading(self, mensagem="Carregando..."):
@@ -241,7 +236,6 @@ if __name__ == "__main__":
     import time
     import requests
 
-    # Verifica se a API Flask já está ativa; se não estiver, inicia automaticamente em segundo plano
     try:
         requests.get("http://127.0.0.1:5000/biblioteca/alunos", timeout=1)
     except Exception:

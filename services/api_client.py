@@ -3,17 +3,49 @@ import requests
 BASE_URL = "http://127.0.0.1:5000/biblioteca"
 TIMEOUT = 5  # segundos
 
+_token = None
+_usuario_logado = None
+
 
 class ApiError(Exception):
     """Erro amigável para erros de API"""
     pass
 
 
+def definir_sessao(token, bibliotecario):
+    global _token, _usuario_logado
+    _token = token
+    _usuario_logado = bibliotecario
+
+
+def limpar_sessao():
+    global _token, _usuario_logado
+    _token = None
+    _usuario_logado = None
+
+
+def obter_token():
+    return _token
+
+
+def obter_usuario_logado():
+    return _usuario_logado
+
+
+def esta_autenticado():
+    return _token is not None
+
+
 def request(method, endpoint, **kwargs):
     endpoint_formatado = endpoint.lstrip("/")
     url = f"{BASE_URL}/{endpoint_formatado}"
+
+    headers = dict(kwargs.pop("headers", {}) or {})
+    if _token and "Authorization" not in headers:
+        headers["Authorization"] = f"Bearer {_token}"
+
     try:
-        response = requests.request(method, url, timeout=TIMEOUT, **kwargs)
+        response = requests.request(method, url, timeout=TIMEOUT, headers=headers, **kwargs)
         response.raise_for_status()
         return response.json() if response.content else None
     except requests.exceptions.ConnectionError:
@@ -51,3 +83,14 @@ def atualizar(recurso, id, dados):
 
 def deletar(recurso, id):
     return request("DELETE", f"/{recurso}/{id}")
+
+
+def login(email, senha):
+    resposta = request("POST", "/bibliotecarios/login", json={"email": email, "senha": senha})
+    if resposta and "token" in resposta:
+        definir_sessao(resposta["token"], resposta.get("bibliotecario"))
+    return resposta
+
+
+def logout():
+    limpar_sessao()

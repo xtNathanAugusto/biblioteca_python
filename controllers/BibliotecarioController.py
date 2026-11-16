@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import request, jsonify, g
 from mysql.connector.errors import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.AuthService import gerar_token
@@ -53,15 +53,19 @@ class BibliotecarioController:
     @staticmethod
     def atualizar(id_bibliotecario):
         dados = request.get_json(silent=True)
-        
+
         if not dados or not dados.get("nome") or not dados.get("email"):
             return jsonify({"erro": "Nome e Email são obrigatórios"}), 400
+
+        senha = dados.get("senha")
+        senha_hash = generate_password_hash(str(senha).strip()) if senha and str(senha).strip() else None
 
         try:
             bibliotecario = Bibliotecario.atualizar(
                 id_bibliotecario,
                 dados["nome"].strip(),
-                dados["email"].strip()
+                dados["email"].strip(),
+                senha_hash=senha_hash
             )
         except IntegrityError:
             return jsonify({"erro": "Email já cadastrado"}), 409
@@ -103,3 +107,15 @@ class BibliotecarioController:
             "token": token,
             "bibliotecario": bibliotecario
         }), 200
+
+    @staticmethod
+    def me():
+        dados_token = getattr(g, "bibliotecario", None)
+        if not dados_token:
+            return jsonify({"erro": "Não autenticado"}), 401
+
+        bibliotecario = Bibliotecario.buscar_por_id(dados_token["id_bibliotecario"])
+        if not bibliotecario:
+            return jsonify({"erro": "Bibliotecário não encontrado"}), 404
+
+        return jsonify(bibliotecario), 200

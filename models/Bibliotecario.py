@@ -10,7 +10,9 @@ class Bibliotecario:
 
         try:
             cursor = conexao.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM bibliotecarios")
+            cursor.execute(
+                "SELECT id_bibliotecario, nome, email, data_cadastro FROM bibliotecarios"
+            )
             return cursor.fetchall()
         finally:
             if cursor:
@@ -24,7 +26,7 @@ class Bibliotecario:
         try:
             cursor = conexao.cursor(dictionary=True)
             cursor.execute(
-                "SELECT * FROM bibliotecarios WHERE id_bibliotecario = %s",
+                "SELECT id_bibliotecario, nome, email, data_cadastro FROM bibliotecarios WHERE id_bibliotecario = %s",
                 (id_bibliotecario,)
             )
             return cursor.fetchone()
@@ -80,18 +82,29 @@ class Bibliotecario:
             conexao.close()
 
     @classmethod
-    def atualizar(cls, id_bibliotecario, nome, email):
+    def atualizar(cls, id_bibliotecario, nome, email, senha_hash=None):
         conexao = obter_conexao()
         cursor = None
         try:
             cursor = conexao.cursor()
-            cursor.execute(
-                "UPDATE bibliotecarios SET nome = %s, email = %s WHERE id_bibliotecario = %s",
-                (nome, email, id_bibliotecario)
-            )
+            if senha_hash:
+                cursor.execute(
+                    "UPDATE bibliotecarios SET nome = %s, email = %s, senha = %s WHERE id_bibliotecario = %s",
+                    (nome, email, senha_hash, id_bibliotecario)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE bibliotecarios SET nome = %s, email = %s WHERE id_bibliotecario = %s",
+                    (nome, email, id_bibliotecario)
+                )
 
             if cursor.rowcount == 0:
-                return None
+                cursor.execute(
+                    "SELECT id_bibliotecario FROM bibliotecarios WHERE id_bibliotecario = %s",
+                    (id_bibliotecario,)
+                )
+                if not cursor.fetchone():
+                    return None
 
             conexao.commit()
 

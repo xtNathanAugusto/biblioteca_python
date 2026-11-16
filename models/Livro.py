@@ -121,7 +121,3 @@ class Livro:
 
     # Alias para compatibilidade
     deletar = excluir
-
-
-    # Alias para compatibilidade
-    deletar = excluir
