@@ -1,7 +1,7 @@
 import sys
 import os
 import threading
-from datetime import date
+from datetime import date, datetime
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -39,9 +39,10 @@ class TelaEmprestimos(tk.Toplevel):
         self.livro_cb = ttk.Combobox(form, width=52, state="readonly")
         self.livro_cb.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
-        ttk.Label(form, text="Data Devolução (AAAA-MM-DD):").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        ttk.Label(form, text="Data Devolução (DD/MM/AAAA):").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.devolucao_entry = ttk.Entry(form, width=25)
         self.devolucao_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+        self.devolucao_entry.bind("<KeyRelease>", self._mascara_data)
 
         botoes = ttk.Frame(self)
         botoes.pack(fill="x", padx=10, pady=5)
@@ -135,6 +136,47 @@ class TelaEmprestimos(tk.Toplevel):
         if self.tree.selection():
             self.tree.selection_remove(self.tree.selection())
 
+    def _mascara_data(self, event):
+        if event.keysym in ("BackSpace", "Delete", "Left", "Right", "Tab"):
+            return
+        digitos = "".join(c for c in self.devolucao_entry.get() if c.isdigit())[:8]
+        novo = ""
+        if len(digitos) > 4:
+            novo = f"{digitos[:2]}/{digitos[2:4]}/{digitos[4:]}"
+        elif len(digitos) > 2:
+            novo = f"{digitos[:2]}/{digitos[2:]}"
+        else:
+            novo = digitos
+        if novo != self.devolucao_entry.get():
+            self.devolucao_entry.delete(0, tk.END)
+            self.devolucao_entry.insert(0, novo)
+
+    @staticmethod
+    def _formatar_data_br(valor):
+        if not valor:
+            return ""
+        texto = str(valor).strip()
+        for fmt_entrada, fmt_saida in (
+            ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M"),
+            ("%Y-%m-%d", "%d/%m/%Y"),
+            ("%d/%m/%Y", "%d/%m/%Y"),
+        ):
+            try:
+                return datetime.strptime(texto, fmt_entrada).strftime(fmt_saida)
+            except ValueError:
+                continue
+        return texto
+
+    @staticmethod
+    def _converter_data_para_banco(valor):
+        texto = (valor or "").strip()
+        if not texto:
+            return None
+        try:
+            return datetime.strptime(texto, "%d/%m/%Y").strftime("%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Data de devolução inválida! Use o formato DD/MM/AAAA.")
+
     def _selecionar_combo_por_id(self, combobox, mapa, id_alvo):
         for chave, valor_id in mapa.items():
             if valor_id == id_alvo:
@@ -162,7 +204,7 @@ class TelaEmprestimos(tk.Toplevel):
                     )
                     self.devolucao_entry.delete(0, tk.END)
                     if registro.get("data_devolucao"):
-                        self.devolucao_entry.insert(0, str(registro.get("data_devolucao")))
+                        self.devolucao_entry.insert(0, self._formatar_data_br(registro.get("data_devolucao")))
 
     def carregar_tudo(self):
         self.iniciar_loading("Carregando dados da API...")
@@ -227,8 +269,8 @@ class TelaEmprestimos(tk.Toplevel):
                 f"{emp.get('id_aluno')} - {emp.get('nome_aluno', '')}",
                 f"{emp.get('id_bibliotecario')} - {emp.get('nome_bibliotecario', '')}",
                 f"{emp.get('id_livro')} - {emp.get('titulo_livro', '')}",
-                emp.get("data") or "",
-                emp.get("data_devolucao") or "Pendente"
+                self._formatar_data_br(emp.get("data")),
+                self._formatar_data_br(emp.get("data_devolucao")) or "Pendente"
             ))
 
     def _obter_dados_formulario(self):
@@ -245,11 +287,17 @@ class TelaEmprestimos(tk.Toplevel):
             messagebox.showwarning("Aviso", "Selecione Aluno, Bibliotecário e Livro!")
             return None
 
+        try:
+            data_banco = self._converter_data_para_banco(data_devolucao)
+        except ValueError as e:
+            messagebox.showwarning("Aviso", str(e))
+            return None
+
         return {
             "id_aluno": id_aluno,
             "id_bibliotecario": id_bibliotecario,
             "id_livro": id_livro,
-            "data_devolucao": data_devolucao if data_devolucao else None
+            "data_devolucao": data_banco
         }
 
     def inserir(self):
@@ -301,15 +349,16 @@ class TelaEmprestimos(tk.Toplevel):
             messagebox.showwarning("Aviso", "Selecione um empréstimo da lista para registrar a devolução!")
             return
 
-        hoje = date.today().strftime("%Y-%m-%d")
+        hoje_br = date.today().strftime("%d/%m/%Y")
+        hoje_banco = date.today().strftime("%Y-%m-%d")
         self.devolucao_entry.delete(0, tk.END)
-        self.devolucao_entry.insert(0, hoje)
+        self.devolucao_entry.insert(0, hoje_br)
 
         self.iniciar_loading("Registrando devolução...")
 
         def tarefa():
             try:
-                api.request("PUT", f"/emprestimos/{self.emprestimo_id}/devolver", json={"data_devolucao": hoje})
+                api.request("PUT", f"/emprestimos/{self.emprestimo_id}/devolver", json={"data_devolucao": hoje_banco})
                 self.after(0, lambda: messagebox.showinfo("Sucesso", "Devolução registrada com sucesso!"))
                 self.after(0, self.limpar)
                 self.after(0, self.carregar_tudo)
